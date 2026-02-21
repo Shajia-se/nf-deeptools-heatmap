@@ -3,6 +3,41 @@ nextflow.enable.dsl = 2
 
 def outdir = params.deeptools_output ?: 'deeptools_heatmap_output'
 
+process deeptools_group_mean_bw {
+  tag "${group_name}"
+  stageInMode 'symlink'
+  stageOutMode 'move'
+
+  publishDir "${params.project_folder}/${outdir}/group_mean_bw", mode: 'copy', overwrite: true
+
+  input:
+    tuple val(group_name), path(bw1), path(bw2)
+
+  output:
+    tuple val(group_name), path("${group_name}.mean.bw")
+
+  script:
+  """
+  set -euo pipefail
+
+  mkdir -p tmp
+  export TMPDIR=\$PWD/tmp
+  export TEMP=\$PWD/tmp
+  export TMP=\$PWD/tmp
+  export MPLCONFIGDIR=\$PWD/tmp/mpl
+  mkdir -p "\$MPLCONFIGDIR"
+
+  bigwigCompare \
+    -b1 ${bw1} \
+    -b2 ${bw2} \
+    --operation mean \
+    --skipNonCoveredRegions \
+    --binSize ${params.bin_size} \
+    --numberOfProcessors ${task.cpus} \
+    -o ${group_name}.mean.bw
+  """
+}
+
 process deeptools_matrix_plot {
   tag "${set_name}"
   stageInMode 'symlink'
@@ -114,14 +149,34 @@ process deeptools_matrix_plot {
 }
 
 workflow {
-  if (!params.bigwig_pattern) {
-    exit 1, 'ERROR: Missing --bigwig_pattern'
-  }
+  def ch_bigwigs
+  if (params.group_pairs_sheet) {
+    def ch_pairs = Channel
+      .fromPath(params.group_pairs_sheet, checkIfExists: true)
+      .splitCsv(header: true)
+      .map { row ->
+        assert row.group_name && row.bw1 && row.bw2 : 'group_pairs_sheet must contain: group_name,bw1,bw2'
+        def b1 = file(row.bw1.toString())
+        def b2 = file(row.bw2.toString())
+        assert b1.exists() : "bw1 not found for ${row.group_name}: ${b1}"
+        assert b2.exists() : "bw2 not found for ${row.group_name}: ${b2}"
+        tuple(row.group_name.toString().trim(), b1, b2)
+      }
 
-  def ch_bigwigs = Channel
-    .fromPath(params.bigwig_pattern, checkIfExists: true)
-    .ifEmpty { exit 1, "ERROR: No bigWig files found with pattern: ${params.bigwig_pattern}" }
-    .collect()
+    ch_bigwigs = deeptools_group_mean_bw(ch_pairs)
+      .map { group_name, bw -> bw }
+      .collect()
+      .map { bw_list -> tuple(bw_list) }
+  } else {
+    if (!params.bigwig_pattern) {
+      exit 1, 'ERROR: Missing --bigwig_pattern'
+    }
+    ch_bigwigs = Channel
+      .fromPath(params.bigwig_pattern, checkIfExists: true)
+      .ifEmpty { exit 1, "ERROR: No bigWig files found with pattern: ${params.bigwig_pattern}" }
+      .collect()
+      .map { bw_list -> tuple(bw_list) }
+  }
 
   def ch_regions
 
@@ -149,9 +204,11 @@ workflow {
     exit 1, 'ERROR: Provide one of --regions_bed, --regions_pattern, or --regions_sheet'
   }
 
-  ch_regions
+  ch_tasks = ch_regions
     .combine(ch_bigwigs)
-    .set { ch_tasks }
+    .map { set_name, regions_bed, bw_wrap ->
+      tuple(set_name, regions_bed, bw_wrap[0])
+    }
 
   deeptools_matrix_plot(ch_tasks)
 }

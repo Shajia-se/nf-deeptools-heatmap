@@ -14,7 +14,7 @@ For each region set (BED), this module runs:
 
 Required:
 
-- `--bigwig_pattern` (glob for `.bw` files)
+- `--bigwig_pattern` (glob for `.bw` files) OR `--group_pairs_sheet` (group means)
 - one regions mode:
   - `--regions_bed` (single BED)
   - `--regions_pattern` (glob of BED files)
@@ -23,6 +23,7 @@ Required:
 Optional:
 
 - `--samples_label` comma-separated labels in bigWig order
+- `--group_pairs_sheet` CSV (`group_name,bw1,bw2`) to build mean bigWig per group (via `bigwigCompare --operation mean`)
 - matrix settings (`--matrix_mode`, `--reference_point`, `--before_region_start_length`, `--after_region_start_length`, `--region_body_length`, `--bin_size`)
 - plot style (`--color_map`, `--dpi`, `--heatmap_height`, `--heatmap_width`, `--profile_height`, `--profile_width`)
 
@@ -39,6 +40,10 @@ Per region set (`<set_name>/`):
 - `<set_name>.heatmap.pdf`
 - `<set_name>.profile.png`
 - `<set_name>.profile.pdf`
+
+If `--group_pairs_sheet` is used:
+
+- `${deeptools_output}/group_mean_bw/<group_name>.mean.bw`
 
 ## Run
 
@@ -60,6 +65,15 @@ Regions sheet:
 ```bash
 nextflow run main.nf -profile hpc \
   --regions_sheet regions_sheet.example.csv
+```
+
+Group-mean mode (WT/TG means first, then heatmap/profile):
+
+```bash
+nextflow run main.nf -profile hpc \
+  --group_pairs_sheet group_pairs_sheet.example.csv \
+  --regions_sheet regions_sheet.example.csv \
+  --samples_label WT TG
 ```
 
 Scale-regions mode:
