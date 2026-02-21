@@ -1,0 +1,3 @@
+set_name,bed
+WT_idr,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/WT_idr.sorted.chr.bed
+TG_idr,/ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/TG_idr.sorted.chr.bed
