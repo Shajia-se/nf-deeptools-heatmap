@@ -206,8 +206,11 @@ workflow {
 
   ch_tasks = ch_regions
     .combine(ch_bigwigs)
-    .map { set_name, regions_bed, bw_wrap ->
-      tuple(set_name, regions_bed, bw_wrap[0])
+    .map { items ->
+      def set_name = items[0]
+      def regions_bed = items[1]
+      def bw_list = items.size() > 2 ? items.subList(2, items.size()) : []
+      tuple(set_name, regions_bed, bw_list)
     }
 
   deeptools_matrix_plot(ch_tasks)
