@@ -168,14 +168,69 @@ workflow {
       .collect()
       .map { bw_list -> tuple(bw_list) }
   } else {
-    if (!params.bigwig_pattern) {
-      exit 1, 'ERROR: Missing --bigwig_pattern'
+    if (params.samples_master) {
+      def master = file(params.samples_master)
+      assert master.exists() : "samples_master not found: ${params.samples_master}"
+
+      def header = null
+      def records = []
+      master.eachLine { line, n ->
+        if (!line?.trim()) return
+        def cols = line.split(',', -1)*.trim()
+        if (n == 1) {
+          header = cols
+        } else {
+          def rec = [:]
+          header.eachWithIndex { h, i -> rec[h] = i < cols.size() ? cols[i] : '' }
+          records << rec
+        }
+      }
+
+      assert header : "samples_master header not found: ${params.samples_master}"
+      assert header.contains('sample_id') : "samples_master missing required column: sample_id"
+
+      def isEnabled = { rec ->
+        def v = rec.enabled?.toString()?.trim()?.toLowerCase()
+        (v == null || v == '' || v == 'true')
+      }
+      def isControl = { rec ->
+        rec.is_control?.toString()?.trim()?.toLowerCase() == 'true'
+      }
+
+      def includeControls = (params.deeptools_include_controls == null) ? false : params.deeptools_include_controls
+      def bwDir = file(params.bigwig_input_dir)
+      assert bwDir.exists() : "bigwig_input_dir not found: ${params.bigwig_input_dir}"
+
+      def bwRows = records
+        .findAll { rec -> isEnabled(rec) }
+        .findAll { rec -> includeControls ? true : !isControl(rec) }
+        .collect { rec ->
+          def sid = rec.sample_id?.toString()?.trim()
+          if (!sid) return null
+          def hits = bwDir.listFiles()?.findAll { f ->
+            f.isFile() && f.name.endsWith('.bw') && (f.name == "${sid}.bw" || f.name.startsWith("${sid}_"))
+          } ?: []
+          if (hits.isEmpty()) throw new IllegalArgumentException("No bigWig found for sample_id '${sid}' under: ${params.bigwig_input_dir}")
+          if (hits.size() > 1) throw new IllegalArgumentException("Multiple bigWigs matched sample_id '${sid}': ${hits*.name.join(', ')}")
+          file(hits[0].toString())
+        }
+        .findAll { it != null }
+
+      ch_bigwigs = Channel
+        .fromList(bwRows)
+        .ifEmpty { exit 1, "ERROR: No bigWigs generated from samples_master: ${params.samples_master}" }
+        .collect()
+        .map { bw_list -> tuple(bw_list) }
+    } else {
+      if (!params.bigwig_pattern) {
+        exit 1, 'ERROR: Missing --bigwig_pattern'
+      }
+      ch_bigwigs = Channel
+        .fromPath(params.bigwig_pattern, checkIfExists: true)
+        .ifEmpty { exit 1, "ERROR: No bigWig files found with pattern: ${params.bigwig_pattern}" }
+        .collect()
+        .map { bw_list -> tuple(bw_list) }
     }
-    ch_bigwigs = Channel
-      .fromPath(params.bigwig_pattern, checkIfExists: true)
-      .ifEmpty { exit 1, "ERROR: No bigWig files found with pattern: ${params.bigwig_pattern}" }
-      .collect()
-      .map { bw_list -> tuple(bw_list) }
   }
 
   def ch_regions
@@ -200,8 +255,51 @@ workflow {
         assert bed.exists() : "BED not found for ${row.set_name}: ${bed}"
         tuple(row.set_name.toString().trim(), bed)
       }
+  } else if (params.samples_master) {
+    def master = file(params.samples_master)
+    assert master.exists() : "samples_master not found: ${params.samples_master}"
+
+    def header = null
+    def records = []
+    master.eachLine { line, n ->
+      if (!line?.trim()) return
+      def cols = line.split(',', -1)*.trim()
+      if (n == 1) {
+        header = cols
+      } else {
+        def rec = [:]
+        header.eachWithIndex { h, i -> rec[h] = i < cols.size() ? cols[i] : '' }
+        records << rec
+      }
+    }
+    assert header : "samples_master header not found: ${params.samples_master}"
+    assert header.contains('condition') : "samples_master missing required column: condition"
+
+    def isEnabled = { rec ->
+      def v = rec.enabled?.toString()?.trim()?.toLowerCase()
+      (v == null || v == '' || v == 'true')
+    }
+    def isControl = { rec ->
+      rec.is_control?.toString()?.trim()?.toLowerCase() == 'true'
+    }
+
+    def conds = records
+      .findAll { rec -> isEnabled(rec) && !isControl(rec) }
+      .collect { rec -> rec.condition?.toString()?.trim() }
+      .findAll { it }
+      .unique()
+
+    def regionRows = conds.collect { cond ->
+      def bed = file("${params.idr_output}/${cond}${params.deeptools_region_suffix}")
+      assert bed.exists() : "Auto regions BED not found for condition '${cond}': ${bed}"
+      tuple(cond, bed)
+    }
+
+    ch_regions = Channel
+      .fromList(regionRows)
+      .ifEmpty { exit 1, "ERROR: No regions generated from samples_master. Provide --regions_sheet or check samples_master/idr_output." }
   } else {
-    exit 1, 'ERROR: Provide one of --regions_bed, --regions_pattern, or --regions_sheet'
+    exit 1, 'ERROR: Provide one of --regions_bed, --regions_pattern, --regions_sheet, or --samples_master (auto regions).'
   }
 
   ch_tasks = ch_regions

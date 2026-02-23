@@ -19,9 +19,14 @@ Required:
   - `--regions_bed` (single BED)
   - `--regions_pattern` (glob of BED files)
   - `--regions_sheet` (CSV with `set_name,bed`)
+  - or `--samples_master` auto regions mode (`<condition>_idr.sorted.chr.bed` from `idr_output`)
 
 Optional:
 
+- `--samples_master` (auto-select bigWigs by sample_id; applies when not using `group_pairs_sheet`)
+- `--bigwig_input_dir` (directory used with `samples_master` mode)
+- `--deeptools_include_controls` (default `false`)
+- `--idr_output` + `--deeptools_region_suffix` for auto regions mode
 - `--samples_label` comma-separated labels in bigWig order
 - `--group_pairs_sheet` CSV (`group_name,bw1,bw2`) to build mean bigWig per group (via `bigwigCompare --operation mean`)
 - matrix settings (`--matrix_mode`, `--reference_point`, `--before_region_start_length`, `--after_region_start_length`, `--region_body_length`, `--bin_size`)
@@ -65,6 +70,24 @@ Regions sheet:
 ```bash
 nextflow run main.nf -profile hpc \
   --regions_sheet regions_sheet.example.csv
+```
+
+`samples_master`-filtered bigWigs:
+
+```bash
+nextflow run main.nf -profile hpc \
+  --samples_master /path/to/samples_master.csv \
+  --bigwig_input_dir /path/to/nf-bamcoverage/bamcoverage_output/bigwig \
+  --regions_sheet regions_sheet.example.csv
+```
+
+Full auto from `samples_master` (bigWigs + regions):
+
+```bash
+nextflow run main.nf -profile hpc \
+  --samples_master /path/to/samples_master.csv \
+  --bigwig_input_dir /path/to/nf-bamcoverage/bamcoverage_output/bigwig \
+  --idr_output /path/to/nf-idr/idr_output
 ```
 
 Group-mean mode (WT/TG means first, then heatmap/profile):
