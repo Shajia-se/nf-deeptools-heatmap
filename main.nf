@@ -246,7 +246,6 @@ process deeptools_matrix_plot {
     --referencePoint ${params.reference_point} \
     -S ${reference_condition}.mean.bw ${treatment_condition}.mean.bw \
     -R ${up_bed} ${down_bed} \
-    --regionsLabel "${gainLabel}" "${lossLabel}" \
     --samplesLabel "${reference_condition} (mean)" "${treatment_condition} (mean)" \
     -b ${params.before_region_start_length} \
     -a ${params.after_region_start_length} \
@@ -259,6 +258,7 @@ process deeptools_matrix_plot {
   plotHeatmap \
     -m matrix_meanTracks.gz \
     -out ${heatmapPng} \
+    --regionsLabel "${gainLabel}" "${lossLabel}" \
     --dpi ${params.dpi} \
     --colorMap ${params.color_map} \
     --heatmapWidth ${params.heatmap_width} \
@@ -268,6 +268,7 @@ process deeptools_matrix_plot {
   plotHeatmap \
     -m matrix_meanTracks.gz \
     -out ${heatmapPdf} \
+    --regionsLabel "${gainLabel}" "${lossLabel}" \
     --colorMap ${params.color_map} \
     --heatmapWidth ${params.heatmap_width} \
     --heatmapHeight ${params.heatmap_height} \
@@ -276,6 +277,7 @@ process deeptools_matrix_plot {
   plotProfile \
     -m matrix_meanTracks.gz \
     -out ${profilePng} \
+    --regionsLabel "${gainLabel}" "${lossLabel}" \
     --dpi ${params.dpi} \
     --plotWidth ${params.profile_width} \
     --plotHeight ${params.profile_height} \
@@ -284,6 +286,7 @@ process deeptools_matrix_plot {
   plotProfile \
     -m matrix_meanTracks.gz \
     -out ${profilePdf} \
+    --regionsLabel "${gainLabel}" "${lossLabel}" \
     --plotWidth ${params.profile_width} \
     --plotHeight ${params.profile_height} \
     --plotTitle "${title}"
