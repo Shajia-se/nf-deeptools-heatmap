@@ -10,6 +10,8 @@ process merge_master_peakset {
 
   publishDir "${params.project_folder}/${outdir}", mode: 'copy', overwrite: true
 
+  container "${params.container_bedtools}"
+
   input:
     path peak_files
 
@@ -36,6 +38,8 @@ process count_reads_in_peaks {
 
   publishDir "${params.project_folder}/${outdir}", mode: 'copy', overwrite: true, pattern: "*.reads_in_peaks.tsv"
 
+  container "${params.container_bedtools}"
+
   input:
     tuple val(sample_id), val(condition), val(replicate), path(bam), path(master_bed)
 
@@ -59,6 +63,8 @@ process compute_scaling_factors {
   stageOutMode 'move'
 
   publishDir "${params.project_folder}/${outdir}", mode: 'copy', overwrite: true
+
+  container "${params.container_bedtools}"
 
   input:
     path(read_count_files)
