@@ -352,8 +352,8 @@ workflow {
   def countInputs = Channel
     .fromList(bamRows)
     .combine(masterPeakset.master_bed)
-    .map { bamRow, masterBed ->
-      tuple(bamRow[0], bamRow[1], bamRow[2], bamRow[3], masterBed)
+    .map { sample_id, condition, replicate, bam, masterBed ->
+      tuple(sample_id, condition, replicate, bam, masterBed)
     }
 
   def readCounts = count_reads_in_peaks(countInputs)
@@ -362,8 +362,8 @@ workflow {
   def scaledInputs = Channel
     .fromList(bamRows)
     .combine(scaling.scaling_factors_tsv)
-    .map { bamRow, scaleTable ->
-      tuple(bamRow[0], bamRow[1], bamRow[2], bamRow[3], scaleTable)
+    .map { sample_id, condition, replicate, bam, scaleTable ->
+      tuple(sample_id, condition, replicate, bam, scaleTable)
     }
 
   def scaledBws = deeptools_scaled_bw(scaledInputs)
