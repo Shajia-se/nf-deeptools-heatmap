@@ -1,114 +1,85 @@
 # nf-deeptools-heatmap
 
-Nextflow DSL2 module for deepTools matrix/heatmap/profile plotting from ChIP-seq bigWig signals.
+Nextflow DSL2 module for the deepTools mean-track heatmap workflow used in this ChIP-seq pipeline.
 
-## What It Does
+This version follows the analysis logic below:
 
-For each region set (BED), this module runs:
+1. collect all enabled non-control sample peaks from `nf-macs3/strict_q0.01`
+2. merge them into one union peak set: `all_peaks_merged.bed`
+3. count reads-in-peaks for each clean BAM
+4. calculate per-sample scaling factors using the minimum reads-in-peaks sample as denominator
+5. generate scaled bigWig files with `bamCoverage`
+6. compute per-condition mean bigWig tracks from the two replicates
+7. run `computeMatrix` on DiffBind gain/loss peak sets
+8. produce heatmap and profile plots
 
-- `computeMatrix` (`reference-point` or `scale-regions`)
-- `plotHeatmap` (PNG + PDF)
-- `plotProfile` (PNG + PDF)
+## Default Inputs
 
-## Inputs
+The module is designed to run automatically from `samples_master.csv` plus upstream module outputs.
 
-Required:
+Required upstream outputs:
+- `nf-chipfilter/chipfilter_output`
+- `nf-macs3/macs3_output/strict_q0.01`
+- `nf-diffbind/diffbind_output`
 
-- `--bigwig_pattern` (glob for `.bw` files) OR `--group_pairs_sheet` (group means)
-- one regions mode:
-  - `--regions_bed` (single BED)
-  - `--regions_pattern` (glob of BED files)
-  - `--regions_sheet` (CSV with `set_name,bed`)
-  - or `--samples_master` auto regions mode (`<condition>_idr.sorted.chr.bed` from `idr_output`)
+Required metadata:
+- `--samples_master`
 
-Optional:
+Expected assumptions:
+- enabled non-control samples are ChIP samples
+- each condition has exactly 2 replicates
+- DiffBind contrast file names follow:
+  - `condition_unique_up.<treatment>.vs.<reference>.bed`
+  - `condition_unique_down.<treatment>.vs.<reference>.bed`
 
-- `--samples_master` (auto-select bigWigs by sample_id; applies when not using `group_pairs_sheet`)
-- `--bigwig_input_dir` (directory used with `samples_master` mode)
-- `--deeptools_include_controls` (default `false`)
-- `--idr_output` + `--deeptools_region_suffix` for auto regions mode
-- `--samples_label` comma-separated labels in bigWig order
-- `--group_pairs_sheet` CSV (`group_name,bw1,bw2`) to build mean bigWig per group (via `bigwigCompare --operation mean`)
-- matrix settings (`--matrix_mode`, `--reference_point`, `--before_region_start_length`, `--after_region_start_length`, `--region_body_length`, `--bin_size`)
-- plot style (`--color_map`, `--dpi`, `--heatmap_height`, `--heatmap_width`, `--profile_height`, `--profile_width`)
+## Main Parameters
 
-## Output
+- `--samples_master`
+- `--chipfilter_output`
+- `--macs3_output`
+- `--deeptools_macs3_profile`
+- `--diffbind_output`
+- `--diffbind_contrast`
+- `--reference_condition`
+- `--treatment_condition`
+- `--blacklist` optional
 
-Output root: `${project_folder}/${deeptools_output}`
+Plot/scaling parameters:
+- `--bin_size`
+- `--extend_reads`
+- `--smooth_length`
+- `--center_reads`
+- `--ignore_duplicates`
+- `--before_region_start_length`
+- `--after_region_start_length`
+- `--color_map`
+- `--plot_title`
 
-Per region set (`<set_name>/`):
+## Outputs
 
-- `<set_name>.matrix.gz`
-- `<set_name>.matrix.tab`
-- `<set_name>.sorted_regions.bed`
-- `<set_name>.heatmap.png`
-- `<set_name>.heatmap.pdf`
-- `<set_name>.profile.png`
-- `<set_name>.profile.pdf`
+Top-level outputs in `deeptools_heatmap_output/`:
+- `all_peaks_merged.bed`
+- `reads_in_peaks.tsv`
+- `scaling_factors.tsv`
+- `matrix_meanTracks.gz`
+- `regions_sorted.bed`
+- `Heatmap_<REF>_vs_<TREAT>_meanTracks.png`
+- `Heatmap_<REF>_vs_<TREAT>_meanTracks.pdf`
+- `Profile_<REF>_vs_<TREAT>_meanTracks.png`
+- `Profile_<REF>_vs_<TREAT>_meanTracks.pdf`
 
-If `--group_pairs_sheet` is used:
+Subdirectories:
+- `deeptools_heatmap_output/scaled_bigwig/`
+- `deeptools_heatmap_output/mean_tracks/`
 
-- `${deeptools_output}/group_mean_bw/<group_name>.mean.bw`
-
-## Run
-
-Default (IDR BED pattern):
-
-```bash
-nextflow run main.nf -profile hpc
-```
-
-Single BED:
-
-```bash
-nextflow run main.nf -profile hpc \
-  --regions_bed /ictstr01/groups/idc/projects/uhlenhaut/jiang/pipelines/nf-idr/idr_output/WT_idr.sorted.chr.bed
-```
-
-Regions sheet:
-
-```bash
-nextflow run main.nf -profile hpc \
-  --regions_sheet regions_sheet.example.csv
-```
-
-`samples_master`-filtered bigWigs:
-
-```bash
-nextflow run main.nf -profile hpc \
-  --samples_master /path/to/samples_master.csv \
-  --bigwig_input_dir /path/to/nf-bamcoverage/bamcoverage_output/bigwig \
-  --regions_sheet regions_sheet.example.csv
-```
-
-Full auto from `samples_master` (bigWigs + regions):
+## Example
 
 ```bash
 nextflow run main.nf -profile hpc \
   --samples_master /path/to/samples_master.csv \
-  --bigwig_input_dir /path/to/nf-bamcoverage/bamcoverage_output/bigwig \
-  --idr_output /path/to/nf-idr/idr_output
-```
-
-Group-mean mode (WT/TG means first, then heatmap/profile):
-
-```bash
-nextflow run main.nf -profile hpc \
-  --group_pairs_sheet group_pairs_sheet.example.csv \
-  --regions_sheet regions_sheet.example.csv \
-  --samples_label WT TG
-```
-
-Scale-regions mode:
-
-```bash
-nextflow run main.nf -profile hpc \
-  --matrix_mode scale-regions \
-  --region_body_length 5000
-```
-
-Resume:
-
-```bash
-nextflow run main.nf -profile hpc -resume
+  --chipfilter_output /path/to/nf-chipfilter/chipfilter_output \
+  --macs3_output /path/to/nf-macs3/macs3_output \
+  --diffbind_output /path/to/nf-diffbind/diffbind_output \
+  --reference_condition WT \
+  --treatment_condition TG
 ```
