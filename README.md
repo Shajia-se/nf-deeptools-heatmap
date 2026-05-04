@@ -6,7 +6,7 @@ This version follows the analysis logic below:
 
 1. collect all enabled non-control sample peaks from `nf-macs3/strict_q0.01`
 2. merge them into one union peak set: `all_peaks_merged.bed`
-3. count reads-in-peaks for each clean BAM
+3. count reads-in-peaks for each MAPQ-filtered BAM
 4. calculate per-sample scaling factors using the minimum reads-in-peaks sample as denominator
 5. generate scaled bigWig files with `bamCoverage`
 6. compute per-condition mean bigWig tracks from the two replicates

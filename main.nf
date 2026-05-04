@@ -335,8 +335,8 @@ workflow {
 
   def bamRows = chipRecords.collect { rec ->
     def bam = resolveUniqueFile(bamDir, { f ->
-      f.name.endsWith('.clean.bam') && (f.name == "${rec.sample_id}.clean.bam" || f.name.startsWith("${rec.sample_id}_"))
-    }, "clean BAM", rec.sample_id)
+      f.name.endsWith('.nomulti.bam') && (f.name == "${rec.sample_id}.nomulti.bam" || f.name.startsWith("${rec.sample_id}_"))
+      }, "MAPQ-filtered BAM", rec.sample_id)
     tuple(rec.sample_id, rec.condition, rec.replicate, bam)
   }
 
